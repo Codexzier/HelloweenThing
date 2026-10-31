@@ -1,0 +1,166 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+  <title>You can't not alive.</title>
+  <meta name="description" content="Ein kleines Halloween-Zombie-Survival-Spiel im Browser. Mitternacht, ein Wald, ein Dorf, ein Friedhof – und nur eine Pistole.">
+  <meta name="theme-color" content="#07090f">
+  <link rel="icon" href="assets/ui/favicon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Creepster&family=Special+Elite&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "./vendor/three/three.module.min.js",
+        "three/addons/": "./vendor/three/addons/"
+      }
+    }
+  </script>
+</head>
+<body data-screen="loading">
+  <canvas id="game"></canvas>
+
+  <!-- Ladebildschirm -->
+  <section id="loading" class="screen">
+    <div class="center">
+      <h1 class="title">You can't<br>not alive.</h1>
+      <div class="bar"><div id="load-bar"></div></div>
+      <p id="load-text">Lade die Nacht …</p>
+    </div>
+  </section>
+
+  <!-- Hauptmenü -->
+  <section id="menu" class="screen hidden">
+    <div class="menu-inner">
+      <p class="kicker">31. Oktober · 00:00 Uhr</p>
+      <h1 class="title">You can't<br>not alive.</h1>
+      <p class="tagline">Mitternacht. Ein Wald. Ein Dorf. Ein Friedhof.<br>Und nur eine Pistole.</p>
+      <nav class="buttons">
+        <button data-action="new"><span>Neues Spiel</span></button>
+        <button data-action="auto"><span>Auto Spiel</span></button>
+        <button data-action="scores"><span>Scoreboard</span></button>
+      </nav>
+      <details class="help">
+        <summary>Steuerung &amp; Regeln</summary>
+        <div class="help-grid">
+          <span><kbd>W A S D</kbd> Bewegen</span>
+          <span><kbd>Maus</kbd> Umsehen / Zielen</span>
+          <span><kbd>Linksklick</kbd> Schiessen</span>
+          <span><kbd>R</kbd> / <kbd>Rechtsklick</kbd> Nachladen</span>
+          <span><kbd>Shift</kbd> Sprinten</span>
+          <span><kbd>F</kbd> Taschenlampe</span>
+          <span><kbd>Esc</kbd> / <kbd>P</kbd> Pause</span>
+        </div>
+        <ul>
+          <li>Folge dem Weg aus dem Wald ins Dorf. Erst dort beginnt die Jagd.</li>
+          <li>Neue Zombies erscheinen 50 m entfernt – aber nur dort, wo du gerade <em>nicht</em> hinsiehst.</li>
+          <li>Zuerst alle 5 Sekunden ein Zombie, jedes Intervall wird 0,1 s kürzer.</li>
+          <li>Kopfschüsse töten sofort. Nach 5 Treffern ist die Nacht für dich vorbei.</li>
+        </ul>
+      </details>
+      <div class="settings">
+        <label>Lautstärke <input id="volume" type="range" min="0" max="1" step="0.05" value="0.8"></label>
+        <label>Maus <input id="sens" type="range" min="0" max="1" step="0.05" value="0.35"></label>
+        <label>Grafik
+          <select id="quality">
+            <option value="high">Hoch</option>
+            <option value="medium">Mittel</option>
+            <option value="low">Niedrig</option>
+          </select>
+        </label>
+      </div>
+    </div>
+    <footer class="credits">3D-Modelle: <a href="https://kenney.nl" target="_blank" rel="noopener">Kenney</a> (CC0) · Engine: three.js · Sounds: prozedural (WebAudio)</footer>
+  </section>
+
+  <!-- Bestenliste -->
+  <section id="scores" class="screen hidden">
+    <div class="panel">
+      <h2>Scoreboard</h2>
+      <p id="scores-mode" class="muted"></p>
+      <p id="scores-error" class="warn"></p>
+      <table class="scores">
+        <thead><tr><th>#</th><th>Name</th><th>Zombies</th><th>Überlebt</th></tr></thead>
+        <tbody id="scores-body"></tbody>
+      </table>
+      <button data-action="back"><span>Zurück</span></button>
+    </div>
+  </section>
+
+  <!-- HUD -->
+  <section id="hud" class="hidden">
+    <div id="hearts"></div>
+    <div id="top-center">
+      <div id="clock">00:00</div>
+      <div id="objective"></div>
+      <div id="interval"></div>
+    </div>
+    <div id="killcount">
+      <svg viewBox="0 0 64 64" aria-hidden="true"><path d="M32 4C17 4 7 14.5 7 28c0 8 3.6 13.6 9 17v9c0 3 2 5 5 5h4v-6h4v6h6v-6h4v6h4c3 0 5-2 5-5v-9c5.4-3.4 9-9 9-17C57 14.5 47 4 32 4zM21 38a7 7 0 1 1 0-14 7 7 0 0 1 0 14zm22 0a7 7 0 1 1 0-14 7 7 0 0 1 0 14zM32 46l-4-7h8z"/></svg>
+      <div><span id="kills">0</span><small>Zombie Count</small></div>
+    </div>
+    <div id="ammo">
+      <svg viewBox="0 0 24 64" aria-hidden="true"><path d="M12 2c-5 6-7 13-7 20v30h14V22c0-7-2-14-7-20zM4 55h16v7H4z"/></svg>
+      <span id="ammo-mag">12</span><span class="sep">/</span><span class="inf">∞</span>
+    </div>
+    <div id="reload-hint">Nachladen …</div>
+    <div id="stamina"><div></div></div>
+    <div id="crosshair"><i></i><i></i><i></i><i></i></div>
+    <div id="hitmarker"></div>
+    <div id="damage-dir"></div>
+    <div id="toast"></div>
+    <div id="killfeed"></div>
+    <div id="intro"></div>
+    <div id="autobadge" class="hidden">AUTO SPIEL · <kbd>Esc</kbd> Pause</div>
+    <button id="pause-btn" data-action="pause" aria-label="Pause">II</button>
+  </section>
+
+  <!-- Pause -->
+  <section id="pause" class="screen hidden">
+    <div class="panel">
+      <h2>Pause</h2>
+      <button data-action="resume"><span>Weiter</span></button>
+      <button data-action="menu"><span>Hauptmenü</span></button>
+    </div>
+  </section>
+
+  <!-- Spielende -->
+  <section id="gameover" class="screen hidden">
+    <div class="panel">
+      <h1 class="title small">Game Over</h1>
+      <p class="muted">Die Nacht hat dich geholt.</p>
+      <div class="stats">
+        <div><b id="go-kills">0</b><small>Zombies</small></div>
+        <div><b id="go-time">00:00</b><small>Überlebt</small></div>
+        <div><b id="go-clock">00:00</b><small>Gestorben um</small></div>
+      </div>
+      <p id="submit-msg"></p>
+      <form id="name-form" class="hidden" autocomplete="off">
+        <input id="name" maxlength="16" placeholder="Dein Name" required>
+        <button type="submit"><span>Eintragen</span></button>
+      </form>
+      <div class="row">
+        <button data-action="again"><span>Nochmal</span></button>
+        <button data-action="scores"><span>Scoreboard</span></button>
+        <button data-action="menu"><span>Hauptmenü</span></button>
+      </div>
+    </div>
+  </section>
+
+  <!-- Touch-Steuerung -->
+  <div id="touch" class="hidden">
+    <div id="touch-look"></div>
+    <div id="stick"><div id="stick-knob"></div></div>
+    <button id="t-fire">FEUER</button>
+    <button id="t-reload">R</button>
+    <button id="t-light">LICHT</button>
+    <button id="t-sprint">SPRINT</button>
+  </div>
+
+  <noscript>Dieses Spiel benötigt JavaScript und WebGL.</noscript>
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>
