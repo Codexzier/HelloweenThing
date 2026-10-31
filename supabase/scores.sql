@@ -1,4 +1,4 @@
--- Globale Bestenliste für "You can't not alive."
+-- Globale Bestenliste für "You cannot survive"
 -- In Supabase: SQL Editor -> New query -> einfügen -> Run
 
 create table if not exists public.scores (

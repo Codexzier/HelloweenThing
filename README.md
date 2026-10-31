@@ -1,4 +1,4 @@
-# You can't not alive.
+# You cannot survive
 
 Ein kleines Halloween-Zombie-Survival-Spiel für den Browser (three.js, ohne Build-Schritt).
 
@@ -15,6 +15,15 @@ Ein kleines Halloween-Zombie-Survival-Spiel für den Browser (three.js, ohne Bui
 - Jeder erledigte Zombie zählt +1 im **Zombie Count**. Kopfschüsse töten sofort.
 - Nach **5 Treffern** durch Zombies ist das Spiel vorbei.
 
+## Waffen & Gegenstände
+
+- **Pistole**: 12 Schuss pro Magazin, unbegrenzte Reserve.
+- **Gewehr**: liegt nach **3 Minuten** am Brunnen (Südseite). Einfach hindurchlaufen – es wird sofort ausgerüstet. Vollautomatisch, 30 Schuss pro Magazin, 150 in Reserve.
+- **Raketenwerfer**: liegt nach **3 weiteren Minuten** (also bei 6:00) am Brunnen (Nordseite). Raketen explodieren mit Flächenschaden, 1 + 7 Raketen.
+- Danach gibt es dort alle 2 Minuten Nachschub. Ist eine Spezialwaffe leer, wechselt der Spieler automatisch zurück zur Pistole.
+- **Handgranaten** erscheinen zufällig im Dorf (grüner Lichtstrahl, je 2 Stück, max. 9). Mit `F` werfen – sie prallen ab und explodieren nach 1,8 Sekunden.
+- Zeiten und Mengen lassen sich in `js/weapons.js` (`WEAPONS`, `PICKUPS`) anpassen.
+
 ## Steuerung
 
 | Taste | Aktion |
@@ -24,15 +33,17 @@ Ein kleines Halloween-Zombie-Survival-Spiel für den Browser (three.js, ohne Bui
 | Linksklick (oder Leertaste) | Schiessen |
 | `R` / Rechtsklick | Nachladen |
 | `Shift` | Sprinten |
-| `F` | Taschenlampe an/aus |
+| `F` (oder `G`) | Handgranate werfen |
+| `1` `2` `3` / `Q` / Mausrad | Waffe wechseln (Pistole, Gewehr, Raketenwerfer) |
+| `L` | Taschenlampe an/aus |
 | `Esc` / `P` | Pause |
 
-Auf Touch-Geräten gibt es einen virtuellen Stick sowie Feuer-, Nachlade-, Licht- und Sprint-Buttons.
+Auf Touch-Geräten gibt es einen virtuellen Stick sowie Feuer-, Nachlade-, Granaten-, Waffenwechsel-, Licht- und Sprint-Buttons.
 
 ## Menü
 
 - **Neues Spiel**: Du steuerst selbst.
-- **Auto Spiel**: Der Computer steuert den Überlebenden (läuft ins Dorf, zielt, schiesst, lädt nach, weicht aus). Bot-Runden werden nicht ins Scoreboard eingetragen.
+- **Auto Spiel**: Der Computer steuert den Überlebenden (läuft ins Dorf, zielt, schiesst, lädt nach, weicht aus, sammelt Waffen und Granaten ein und wirft Granaten in Gruppen). Bot-Runden werden nicht ins Scoreboard eingetragen.
 - **Scoreboard**: Die 20 besten Runden (Zombie Count, danach Überlebenszeit).
 
 ## Inhalte & Effekte
@@ -113,6 +124,7 @@ js/main.js            Spielablauf und Hauptschleife
 js/world.js           Wald, Weg, Dorf, Friedhof, Licht, Himmel, Kollisionen
 js/player.js          Überlebender, Kamera, Pistole, Taschenlampe
 js/zombies.js         Gegner, Wegfindung, Spawn-Regeln
+js/weapons.js         Waffen, Raketen, Handgranaten, Explosionen, Einsammel-Gegenstände
 js/autopilot.js       Computergesteuerter Spieler („Auto Spiel“)
 js/effects.js         Partikel, Bodennebel, Fledermäuse, Blitze, Postprocessing
 js/audio.js           Prozedurale Sounds (WebAudio)

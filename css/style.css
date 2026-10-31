@@ -107,7 +107,17 @@ table.scores tr.me td { background: rgba(255, 138, 31, 0.18); }
 #killcount.pop #kills { animation: pop 0.35s; }
 @keyframes pop { 0% { transform: scale(1.6); color: #fff; } 100% { transform: scale(1); } }
 
-#ammo { position: absolute; bottom: 22px; right: 26px; font-family: var(--title); font-size: 2.6rem; display: flex; align-items: center; gap: 8px; text-shadow: 0 2px 6px #000; }
+#weapon-box { position: absolute; bottom: 18px; right: 26px; display: flex; flex-direction: column; align-items: flex-end; gap: 2px; }
+#weapon-name { color: var(--ember); font-size: 0.85rem; letter-spacing: 0.15em; text-transform: uppercase; text-shadow: 0 2px 4px #000; }
+#weapons-owned { display: flex; gap: 6px; }
+#weapons-owned span { font-size: 0.7rem; padding: 1px 6px; border: 1px solid rgba(255,255,255,0.2); color: var(--muted); background: rgba(0,0,0,0.4); }
+#weapons-owned span.on { border-color: var(--pumpkin); color: var(--ember); }
+#grenades { display: flex; align-items: center; gap: 6px; font-family: var(--title); font-size: 1.6rem; text-shadow: 0 2px 6px #000; transition: opacity 0.3s; }
+#grenades svg { width: 18px; height: 24px; fill: #7fa86a; }
+#grenades small { font-family: var(--body); font-size: 0.7rem; color: var(--muted); }
+#grenades.empty { opacity: 0.35; }
+#grenades.pop span { animation: pop 0.35s; }
+#ammo { font-family: var(--title); font-size: 2.6rem; display: flex; align-items: center; gap: 8px; text-shadow: 0 2px 6px #000; }
 #ammo svg { width: 14px; height: 38px; fill: #d9b25f; }
 #ammo .sep, #ammo .inf { color: var(--muted); font-size: 1.8rem; }
 #ammo.low #ammo-mag { color: #ff4040; animation: blink 0.5s infinite alternate; }
@@ -163,6 +173,9 @@ body.shake #hud { animation: shake 0.35s; }
 #t-reload { right: 140px; bottom: 60px; }
 #t-light { right: 40px; bottom: 30px; font-size: 0.8rem !important; }
 #t-sprint { left: 180px; bottom: 40px; font-size: 0.75rem !important; }
+#t-grenade { right: 140px; bottom: 150px; font-size: 0.7rem !important; background: rgba(40, 80, 30, 0.6) !important; }
+#t-switch { right: 220px; bottom: 40px; font-size: 0.75rem !important; }
+@media (pointer: coarse) { #weapon-box { bottom: 200px; } }
 @media (pointer: coarse) { #pause-btn { display: block; } #crosshair { display: block; } }
 
 @media (max-width: 640px) {

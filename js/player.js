@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { CONFIG } from './config.js';
 import { createSurvivor, pointBone, fadeTo } from './characters.js';
 import { glowTexture } from './effects.js';
+import { WEAPONS, WEAPON_ORDER, PICKUPS, weaponModel } from './weapons.js';
 
 const UP = new THREE.Vector3(0, 1, 0);
 
@@ -14,18 +15,16 @@ export class Player {
     this.root = this.char.root;
     this.bones = this.char.bones;
 
-    // Pistole (Kenney Weapon Pack)
-    const pg = assets.get('weapons/pistol');
-    this.pistol = new THREE.Group();
-    if (pg) {
-      const m = pg.scene.clone(true);
-      m.scale.setScalar(0.8);
-      m.rotation.y = Math.PI; // Lauf zeigt nach -Z der Gruppe
-      m.position.set(0, -0.09, 0.02);
-      m.traverse((o) => { if (o.isMesh) o.castShadow = true; });
-      this.pistol.add(m);
+    // Waffen (Kenney Weapon Pack) – ein Halter, darin je ein Modell pro Waffe
+    this.gun = new THREE.Group();
+    this.gunModels = {};
+    for (const k of WEAPON_ORDER) {
+      const m = weaponModel(assets, k);
+      m.visible = false;
+      this.gun.add(m);
+      this.gunModels[k] = m;
     }
-    scene.add(this.pistol);
+    scene.add(this.gun);
 
     // Mündungsfeuer
     this.flash = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTexture('rgba(255,240,200,1)', 'rgba(255,140,30,0)'), blending: THREE.AdditiveBlending, depthWrite: false, transparent: true, color: new THREE.Color(4, 3, 1.6) }));
@@ -52,12 +51,16 @@ export class Player {
   reset() {
     const s = CONFIG.world.start;
     this.pos.set(s.x, 0, s.z);
+    this.vel.set(0, 0, 0);
     this.yaw = 0;
     this.pitch = -0.05;
     this.bodyYaw = 0;
     this.hits = 0;
     this.invulnUntil = 0;
-    this.ammo = CONFIG.player.magazine;
+    this.arsenal = { pistol: { ammo: WEAPONS.pistol.mag, reserve: Infinity } };
+    this.weapon = 'pistol';
+    this.grenades = 0;
+    this.lastThrow = -10;
     this.reloadUntil = 0;
     this.lastShot = 0;
     this.stamina = 1;
@@ -72,11 +75,48 @@ export class Player {
     this.char.model.position.set(0, 0, 0);
     this.root.position.copy(this.pos);
     this.root.visible = true;
-    this.pistol.visible = true;
+    this.gun.visible = true;
+    this._showWeapon();
     fadeTo(this.char, 'idle', 0);
   }
 
+  get def() { return WEAPONS[this.weapon]; }
+  get slot() { return this.arsenal[this.weapon]; }
+  get ammo() { return this.slot.ammo; }
+  get reserve() { return this.slot.reserve; }
   get reloading() { return this.game.time < this.reloadUntil; }
+
+  _showWeapon() { for (const k of WEAPON_ORDER) this.gunModels[k].visible = k === this.weapon; }
+
+  switchTo(key) {
+    if (!this.arsenal[key] || key === this.weapon || this.dead) return;
+    this.weapon = key;
+    this.reloadUntil = 0;
+    this.lastShot = this.game.time - this.def.cooldown + 0.25;
+    this._showWeapon();
+    this.game.audio.click(700, 0.2);
+    this.game.audio.click(1100, 0.15, 0.08);
+  }
+  cycle(dir = 1) {
+    const owned = WEAPON_ORDER.filter((k) => this.arsenal[k]);
+    const i = owned.indexOf(this.weapon);
+    this.switchTo(owned[(i + dir + owned.length) % owned.length]);
+  }
+
+  // Eingesammelter Gegenstand – Waffen werden sofort benutzt
+  give(type) {
+    if (type === 'grenade') {
+      this.grenades = Math.min(PICKUPS.grenadeMax, this.grenades + PICKUPS.grenadesPerPickup);
+      return `+${PICKUPS.grenadesPerPickup} Handgranaten  (F zum Werfen)`;
+    }
+    const def = WEAPONS[type];
+    const had = !!this.arsenal[type];
+    if (had) this.arsenal[type].reserve = Math.min(def.reserve * 2, this.arsenal[type].reserve + def.reserve);
+    else this.arsenal[type] = { ammo: def.mag, reserve: def.reserve };
+    this.weapon = '';
+    this.switchTo(type);
+    return had ? `Munition für ${def.name}!` : `${def.name} aufgenommen!`;
+  }
 
   forward(out = new THREE.Vector3()) {
     return out.set(-Math.sin(this.yaw) * Math.cos(this.pitch), Math.sin(this.pitch), -Math.cos(this.yaw) * Math.cos(this.pitch));
@@ -107,21 +147,44 @@ export class Player {
   }
 
   tryReload() {
-    if (this.reloading || this.ammo >= CONFIG.player.magazine || this.dead) return;
-    this.reloadUntil = this.game.time + CONFIG.player.reloadMs / 1000;
+    const s = this.slot;
+    if (this.reloading || s.ammo >= this.def.mag || s.reserve <= 0 || this.dead) return;
+    this.reloadUntil = this.game.time + this.def.reload;
     this.game.audio.reload();
+  }
+
+  _finishReload() {
+    const s = this.slot;
+    const take = Math.min(this.def.mag - s.ammo, s.reserve);
+    s.ammo += take;
+    if (s.reserve !== Infinity) s.reserve -= take;
+    this.reloadUntil = 0;
+  }
+
+  throwGrenade() {
+    const g = this.game;
+    if (this.grenades <= 0 || g.time - this.lastThrow < 0.8 || this.dead) return;
+    this.grenades--;
+    this.lastThrow = g.time;
+    const hand = this.bones.RightHand ? this.bones.RightHand.getWorldPosition(new THREE.Vector3()) : this.pos.clone().setY(1.5);
+    hand.y = Math.max(hand.y, 1.4);
+    const v = this.aimDir.clone().multiplyScalar(15).add(new THREE.Vector3(0, 5.5, 0)).add(new THREE.Vector3(this.vel.x, 0, this.vel.z).multiplyScalar(0.5));
+    g.projectiles.grenade(hand.addScaledVector(this.aimDir, 0.5), v);
   }
 
   update(dt, ctrl) {
     const g = this.game;
     const C = CONFIG.player;
-    if (this.reloadUntil && g.time >= this.reloadUntil && this.ammo < C.magazine) { this.ammo = C.magazine; this.reloadUntil = 0; }
+    if (this.reloadUntil && g.time >= this.reloadUntil) this._finishReload();
 
     if (!this.dead) {
       // Blickrichtung
       this.yaw -= ctrl.lookX;
       this.pitch = THREE.MathUtils.clamp(this.pitch - ctrl.lookY, -1.0, 0.75);
       if (ctrl.toggleLight) { this.torchOn = !this.torchOn; g.audio.click(1200, 0.15); }
+      if (ctrl.weapon) this.switchTo(ctrl.weapon);
+      if (ctrl.cycle) this.cycle(ctrl.cycle);
+      if (ctrl.grenade) this.throwGrenade();
 
       // Bewegung relativ zur Kamera
       const fx = -Math.sin(this.yaw), fz = -Math.cos(this.yaw);
@@ -131,7 +194,7 @@ export class Player {
       if (ml > 1) { mx /= ml; my /= ml; }
       const sprinting = ctrl.sprint && my > 0.3 && this.stamina > 0.05;
       this.stamina = THREE.MathUtils.clamp(this.stamina + (sprinting ? -0.22 : 0.14) * dt, 0, 1);
-      const speed = sprinting ? C.sprintSpeed : C.walkSpeed;
+      const speed = (sprinting ? C.sprintSpeed : C.walkSpeed) * (this.weapon === 'launcher' ? 0.9 : 1);
       const wantX = (fx * my + rx * mx) * speed, wantZ = (fz * my + rz * mx) * speed;
       const k = Math.min(1, dt * 12);
       this.vel.x += (wantX - this.vel.x) * k;
@@ -162,9 +225,14 @@ export class Player {
 
       // Schiessen / Nachladen
       if (ctrl.reload) this.tryReload();
-      if (ctrl.fire && !this.reloading && g.time - this.lastShot > C.fireCooldownMs / 1000 && !sprinting) {
+      if (ctrl.fire && !this.reloading && g.time - this.lastShot > this.def.cooldown && !sprinting) {
         this.lastShot = g.time;
-        if (this.ammo > 0) this.shoot(); else { g.audio.dryFire(); this.tryReload(); }
+        if (this.ammo > 0) this.shoot();
+        else if (this.reserve > 0) this.tryReload();
+        else { g.audio.dryFire(); this._dropEmpty(); }
+      }
+      if (this.ammo === 0 && !this.reloading && g.time - this.lastShot > 0.35) {
+        if (this.reserve > 0) this.tryReload(); else this._dropEmpty();
       }
       this.sprinting = sprinting;
     } else {
@@ -188,27 +256,31 @@ export class Player {
       pointBone(B.RightArm, B.RightForeArm, aim);
       pointBone(B.RightForeArm, B.RightHand, aim);
       const hand = B.RightHand.getWorldPosition(new THREE.Vector3());
+      // linke Hand greift bei Gewehr/Raketenwerfer weiter vorne
+      const grip = hand.clone().addScaledVector(aim, this.weapon === 'pistol' ? 0.02 : 0.32);
       const shoulderL = B.LeftArm.getWorldPosition(new THREE.Vector3());
-      const toHand = hand.clone().addScaledVector(aim, 0.02).sub(shoulderL).normalize();
-      pointBone(B.LeftArm, B.LeftForeArm, toHand.clone().lerp(aim, 0.25).normalize());
+      const toGrip = grip.clone().sub(shoulderL).normalize();
+      pointBone(B.LeftArm, B.LeftForeArm, toGrip.clone().lerp(aim, 0.25).normalize());
       const elbow = B.LeftForeArm.getWorldPosition(new THREE.Vector3());
-      pointBone(B.LeftForeArm, B.LeftHand, hand.clone().sub(elbow).normalize());
+      pointBone(B.LeftForeArm, B.LeftHand, grip.clone().sub(elbow).normalize());
     }
 
-    // Pistole in die Hand
+    // Waffe in die Hand
     if (B.RightHand) {
       const hand = B.RightHand.getWorldPosition(new THREE.Vector3());
       const dir = this.sprinting || this.dead ? new THREE.Vector3(-Math.sin(this.bodyYaw), -0.8, -Math.cos(this.bodyYaw)).normalize() : this.aimDir;
-      this.pistol.position.copy(hand).addScaledVector(dir, 0.07);
-      this.pistol.quaternion.setFromRotationMatrix(new THREE.Matrix4().lookAt(new THREE.Vector3(), dir.clone().negate(), UP));
+      this.gun.position.copy(hand).addScaledVector(dir, 0.05);
+      // +Z der Gruppe zeigt in Zielrichtung
+      this.gun.quaternion.setFromRotationMatrix(new THREE.Matrix4().lookAt(new THREE.Vector3(), dir.clone().negate(), UP));
     }
-    this.pistol.visible = !this.dead || this.deathT < 0.3;
+    this.gun.visible = !this.dead || this.deathT < 0.3;
 
     // Mündungsfeuer
     this.flashT -= dt;
     const muzzle = this.muzzle();
     this.flash.position.copy(muzzle);
     this.flash.visible = this.flashT > 0;
+    this.flash.scale.setScalar(this.weapon === 'pistol' ? 0.9 : 1.3);
     this.flash.material.rotation = Math.random() * 6;
     this.flashLight.position.copy(muzzle);
     this.flashLight.intensity = this.flashT > 0 ? 30 : 0;
@@ -226,24 +298,34 @@ export class Player {
     this.recoil = Math.max(0, this.recoil - dt * 6);
   }
 
+  // Leere Spezialwaffe ablegen und zurück zur Pistole
+  _dropEmpty() {
+    if (this.weapon === 'pistol') return;
+    const name = this.def.name;
+    delete this.arsenal[this.weapon];
+    this.weapon = '';
+    this.switchTo('pistol');
+    this.game.ui.toast(`${name}: keine Munition mehr.`, 2.5);
+  }
+
   muzzle() {
-    return this.pistol.position.clone().addScaledVector(this.aimDir, 0.24).add(new THREE.Vector3(0, 0.04, 0));
+    return this.gun.position.clone().addScaledVector(this.aimDir, this.def.muzzle).add(new THREE.Vector3(0, 0.04, 0));
   }
 
   shoot() {
     const g = this.game;
-    this.ammo--;
+    const def = this.def;
+    this.slot.ammo--;
     this.flashT = 0.05;
     this.recoil = 1;
-    this.shake = Math.max(this.shake, 0.12);
-    this.pitch = Math.min(0.75, this.pitch + 0.012);
-    g.audio.shot();
+    this.shake = Math.max(this.shake, def.rocket ? 0.35 : 0.12);
+    this.pitch = Math.min(0.75, this.pitch + def.recoil);
     // Strahl von der Kamera durch das Fadenkreuz
     const cam = g.camera;
     const origin = cam.position.clone();
     const dir = new THREE.Vector3();
     cam.getWorldDirection(dir);
-    const spread = (this.moving ? 0.012 : 0.004);
+    const spread = def.rocket ? 0 : (this.moving ? def.spread[1] : def.spread[0]);
     dir.x += (Math.random() - 0.5) * spread; dir.y += (Math.random() - 0.5) * spread; dir.z += (Math.random() - 0.5) * spread;
     dir.normalize();
     const minT = origin.distanceTo(this.pos.clone().setY(1.5)) * 0.9;
@@ -252,13 +334,24 @@ export class Player {
     if (dir.y < -1e-4) tWorld = Math.min(tWorld, -origin.y / dir.y);
     const zh = g.zombies.raycast(origin, dir, Math.min(tWorld, range + minT), minT);
     const end = origin.clone().addScaledVector(dir, zh ? zh.t : Math.min(tWorld, range));
-    g.tracers.add(this.muzzle(), end);
-    if (zh) {
-      g.zombies.hit(zh.zombie, zh.head ? 99 : 1, end, dir, zh.head);
-      g.ui.hitMarker(zh.head);
-    } else if (tWorld < range) {
-      g.sparks.burst(end, 6, { color: new THREE.Color(1.5, 1.1, 0.6), speed: 1.6, up: 1.5, size: 0.05, life: 0.35 });
-      g.particles.burst(end, 5, { color: new THREE.Color(0.25, 0.22, 0.18), speed: 1, up: 1.2, size: 0.12, life: 0.6 });
+
+    if (def.rocket) {
+      // Rakete fliegt vom Lauf zum Zielpunkt
+      const m = this.muzzle();
+      const rdir = end.clone().sub(m);
+      if (rdir.lengthSq() < 4) rdir.copy(dir);
+      g.projectiles.rocket(m, rdir.normalize());
+      g.particles.burst(this.gun.position.clone().addScaledVector(this.aimDir, -0.6), 12, { color: new THREE.Color(0.35, 0.35, 0.35), speed: 1.2, up: 0.8, size: 0.5, life: 1, gravity: 0.5 });
+    } else {
+      g.audio.shot(def.sound);
+      g.tracers.add(this.muzzle(), end);
+      if (zh) {
+        g.zombies.hit(zh.zombie, zh.head ? 99 : def.damage, end, dir, zh.head);
+        g.ui.hitMarker(zh.head);
+      } else if (tWorld < range) {
+        g.sparks.burst(end, 6, { color: new THREE.Color(1.5, 1.1, 0.6), speed: 1.6, up: 1.5, size: 0.05, life: 0.35 });
+        g.particles.burst(end, 5, { color: new THREE.Color(0.25, 0.22, 0.18), speed: 1, up: 1.2, size: 0.12, life: 0.6 });
+      }
     }
     // Lärm lockt Zombies
     g.zombies.alert(this.pos);

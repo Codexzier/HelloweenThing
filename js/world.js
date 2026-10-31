@@ -638,8 +638,11 @@ export class World {
     // Flügel (drehen sich)
     const sails = this.assets.get('town/windmill').scene.clone(true);
     sails.scale.setScalar(T * 1.25);
-    const hub = new THREE.Vector3(T + 0.6, 2.4 * T, 0).applyMatrix4(H);
+    // Nabe deutlich vor der Wand, damit die Flügel nicht durchs Gebäude streichen
+    const hub = new THREE.Vector3(T + 1.25, 2.4 * T, 0).applyMatrix4(H);
     sails.position.copy(hub);
+    // Erst um die eigene Achse (X) drehen, dann um Y ausrichten
+    sails.rotation.order = 'YXZ';
     sails.rotation.y = rot;
     sails.traverse((o) => { if (o.isMesh) o.castShadow = true; });
     this.root.add(sails);

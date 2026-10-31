@@ -19,12 +19,13 @@ export class Autopilot {
     this.noiseT = 0;
     this.target = null;
     this.reactT = 0;
+    this.grenadeCd = 0;
   }
 
   control(dt) {
     const g = this.game;
     const p = g.player;
-    const ctrl = { moveX: 0, moveY: 0, lookX: 0, lookY: 0, fire: false, reload: false, sprint: false, toggleLight: false };
+    const ctrl = { moveX: 0, moveY: 0, lookX: 0, lookY: 0, fire: false, reload: false, sprint: false, toggleLight: false, grenade: false, weapon: null, cycle: 0 };
     if (p.dead) return ctrl;
     const pos = p.pos;
     let desiredYaw = p.yaw, desiredPitch = -0.05;
@@ -68,6 +69,14 @@ export class Autopilot {
       const dc = Math.hypot(pos.x, pos.z);
       if (dc > 16) move.add(new THREE.Vector3(-pos.x, 0, -pos.z).multiplyScalar((dc - 16) * 0.08 / dc));
 
+      // Gegenstände einsammeln, wenn die Lage es zulässt
+      let item = null, id = Infinity;
+      for (const it of g.pickups.items) {
+        const d = Math.hypot(it.x - pos.x, it.z - pos.z);
+        if (d < id) { id = d; item = it; }
+      }
+      if (item && (threat > 7 || id < 6)) move.add(new THREE.Vector3(item.x - pos.x, 0, item.z - pos.z).normalize().multiplyScalar(1.3));
+
       if (this.target) {
         const z = this.target;
         const aim = new THREE.Vector3(z.pos.x, z.def.head[0] - z.def.head[1] * 0.6, z.pos.z);
@@ -79,6 +88,18 @@ export class Autopilot {
         desiredYaw = Math.atan2(-dx, -dz);
         desiredPitch = Math.atan2(dy, hd);
         const d = z.pos.distanceTo(pos);
+        const cluster = alive.filter((o) => o.pos.distanceTo(z.pos) < 5).length;
+        // Waffe wählen
+        let want = 'pistol';
+        if (p.arsenal.rifle) want = 'rifle';
+        if (p.arsenal.launcher && d > 8 && (cluster >= 3 || z.def.boss || !p.arsenal.rifle)) want = 'launcher';
+        if (want !== p.weapon && g.time - p.lastShot > 0.4) ctrl.weapon = want;
+        // Handgranate in eine Gruppe werfen
+        this.grenadeCd -= dt;
+        if (p.grenades > 0 && this.grenadeCd <= 0 && d > 7 && d < 15 && cluster >= 3) {
+          this.grenadeCd = 3;
+          ctrl.grenade = true;
+        }
         // seitlich ausweichen
         this.strafeT -= dt;
         if (this.strafeT <= 0) { this.strafe = -this.strafe; this.strafeT = 1.5 + Math.random() * 2; }
@@ -91,7 +112,7 @@ export class Autopilot {
         if (yawErr < tol && pitchErr < tol * 1.5 && d < 42) {
           const dir = new THREE.Vector3(dx, dy, dz).normalize();
           const blocked = g.world.colliders.raycast(cam.clone().addScaledVector(dir, 3), dir, Math.max(0, Math.hypot(dx, dy, dz) - 3.5)) < Math.hypot(dx, dy, dz) - 3.5;
-          if (!blocked) ctrl.fire = true;
+          if (!blocked && !(p.weapon === 'launcher' && d < 6)) ctrl.fire = true;
           else move.addScaledVector(right, this.strafe * 0.8);
         }
         if (threat < 4.5 && alive.length > 2) ctrl.sprint = false;

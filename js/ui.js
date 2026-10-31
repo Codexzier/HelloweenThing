@@ -48,6 +48,20 @@ export class UI {
     const set = (id, v) => { if (this._last[id] !== v) { this._last[id] = v; $(id).textContent = v; } };
     set('kills', String(g.kills));
     set('ammo-mag', String(p.ammo));
+    set('ammo-res', p.reserve === Infinity ? '∞' : String(p.reserve));
+    set('weapon-name', p.def.name);
+    set('gren', String(p.grenades));
+    if (this._last.gn !== p.grenades) {
+      if (p.grenades > (this._last.gn || 0)) { const e = $('grenades'); e.classList.remove('pop'); void e.offsetWidth; e.classList.add('pop'); }
+      this._last.gn = p.grenades;
+    }
+    $('grenades').classList.toggle('empty', p.grenades === 0);
+    const owned = ['pistol', 'rifle', 'launcher'].filter((k) => p.arsenal[k]).map((k, i) => `${k}:${k === p.weapon}`).join();
+    if (this._last.owned !== owned) {
+      this._last.owned = owned;
+      const labels = { pistol: '1 Pistole', rifle: '2 Gewehr', launcher: '3 Rakete' };
+      $('weapons-owned').innerHTML = ['pistol', 'rifle', 'launcher'].filter((k) => p.arsenal[k]).map((k) => `<span class="${k === p.weapon ? 'on' : ''}">${labels[k]}</span>`).join('');
+    }
     const clockMin = Math.floor(g.playTime);
     set('clock', `${String(Math.floor(clockMin / 60) % 24).padStart(2, '0')}:${String(clockMin % 60).padStart(2, '0')}`);
     const lost = p.hits;

@@ -8,6 +8,7 @@ export class Input {
     this.mx = 0; this.my = 0;
     this.fireHeld = false;
     this.pressed = new Set();
+    this.wheel = 0;
     this.sensitivity = 0.0022;
     this.touch = { active: false, moveId: null, lookId: null, mx: 0, my: 0, sx: 0, sy: 0, lx: 0, ly: 0 };
     this.isTouch = matchMedia('(pointer: coarse)').matches || 'ontouchstart' in window;
@@ -23,6 +24,7 @@ export class Input {
     addEventListener('mousemove', (e) => {
       if (document.pointerLockElement === canvas) { this.mx += e.movementX; this.my += e.movementY; }
     });
+    canvas.addEventListener('wheel', (e) => { if (this.locked) this.wheel += Math.sign(e.deltaY); }, { passive: true });
     canvas.addEventListener('mousedown', (e) => {
       if (e.button === 0) this.fireHeld = true;
       if (e.button === 2) this.pressed.add('KeyR');
@@ -53,7 +55,9 @@ export class Input {
     };
     btn('t-fire', () => (this.fireHeld = true), () => (this.fireHeld = false));
     btn('t-reload', () => this.pressed.add('KeyR'));
-    btn('t-light', () => this.pressed.add('KeyF'));
+    btn('t-light', () => this.pressed.add('KeyL'));
+    btn('t-grenade', () => this.pressed.add('KeyF'));
+    btn('t-switch', () => this.pressed.add('KeyQ'));
     btn('t-sprint', () => (T.sprint = !T.sprint));
     stick.addEventListener('touchstart', (e) => {
       e.preventDefault();
@@ -104,8 +108,12 @@ export class Input {
       fire: this.fireHeld || k.has('Space'),
       reload: this.pressed.has('KeyR'),
       sprint: k.has('ShiftLeft') || k.has('ShiftRight') || !!T.sprint,
-      toggleLight: this.pressed.has('KeyF'),
+      toggleLight: this.pressed.has('KeyL'),
+      grenade: this.pressed.has('KeyF') || this.pressed.has('KeyG'),
+      weapon: this.pressed.has('Digit1') ? 'pistol' : this.pressed.has('Digit2') ? 'rifle' : this.pressed.has('Digit3') ? 'launcher' : null,
+      cycle: this.pressed.has('KeyQ') ? 1 : (this.wheel ? Math.sign(this.wheel) : 0),
     };
+    this.wheel = 0;
     this.mx = 0; this.my = 0;
     this.pressed.clear();
     return c;

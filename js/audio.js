@@ -115,19 +115,89 @@ export class AudioFX {
   }
 
   // ---------------- Waffe ----------------
-  shot() {
-    if (!this._ok() || this._custom('shot')) return;
+  shot(type = 'pistol') {
+    if (!this._ok() || this._custom(type === 'rifle' ? 'rifle' : 'shot')) return;
     const ctx = this.ctx, t = ctx.currentTime;
-    const out = this._out(null, 0.9);
+    const rifle = type === 'rifle';
+    const out = this._out(null, rifle ? 0.75 : 0.9);
     const n = ctx.createBufferSource(); n.buffer = this.noise;
     const bp = ctx.createBiquadFilter(); bp.type = 'lowpass'; bp.frequency.setValueAtTime(5200, t); bp.frequency.exponentialRampToValueAtTime(400, t + 0.25);
-    const ng = ctx.createGain(); ng.gain.setValueAtTime(1.2, t); ng.gain.exponentialRampToValueAtTime(0.001, t + 0.3);
+    const ng = ctx.createGain(); ng.gain.setValueAtTime(1.2, t); ng.gain.exponentialRampToValueAtTime(0.001, t + (rifle ? 0.16 : 0.3));
     n.connect(bp).connect(ng).connect(out);
     n.start(t, Math.random()); n.stop(t + 0.35);
     const o = ctx.createOscillator(); o.type = 'sine';
     o.frequency.setValueAtTime(150, t); o.frequency.exponentialRampToValueAtTime(40, t + 0.18);
     const og = ctx.createGain(); og.gain.setValueAtTime(1.3, t); og.gain.exponentialRampToValueAtTime(0.001, t + 0.22);
     o.connect(og).connect(out); o.start(t); o.stop(t + 0.25);
+  }
+  // Raketenstart: Zischen mit steigender Tonhöhe
+  rocket() {
+    if (!this._ok() || this._custom('rocket')) return;
+    const ctx = this.ctx, t = ctx.currentTime;
+    const out = this._out(null, 0.9);
+    const n = ctx.createBufferSource(); n.buffer = this.noise;
+    const f = ctx.createBiquadFilter(); f.type = 'bandpass'; f.Q.value = 1.2;
+    f.frequency.setValueAtTime(300, t); f.frequency.exponentialRampToValueAtTime(2400, t + 0.6);
+    const g = ctx.createGain(); g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(1.4, t + 0.04); g.gain.exponentialRampToValueAtTime(0.001, t + 0.9);
+    n.connect(f).connect(g).connect(out); n.start(t, Math.random()); n.stop(t + 1);
+    const o = ctx.createOscillator(); o.type = 'sine'; o.frequency.setValueAtTime(110, t); o.frequency.exponentialRampToValueAtTime(40, t + 0.2);
+    const og = ctx.createGain(); og.gain.setValueAtTime(1, t); og.gain.exponentialRampToValueAtTime(0.001, t + 0.25);
+    o.connect(og).connect(out); o.start(t); o.stop(t + 0.3);
+  }
+  explosion(pos) {
+    if (!this._ok() || this._custom('explosion', pos)) return;
+    const ctx = this.ctx, t = ctx.currentTime;
+    const out = this._out(pos, 2.2);
+    const s = ctx.createBufferSource(); s.buffer = this._brown(3);
+    const f = ctx.createBiquadFilter(); f.type = 'lowpass'; f.frequency.setValueAtTime(1800, t); f.frequency.exponentialRampToValueAtTime(120, t + 1.6);
+    const g = ctx.createGain(); g.gain.setValueAtTime(2.2, t); g.gain.exponentialRampToValueAtTime(0.001, t + 2.2);
+    s.connect(f).connect(g).connect(out); s.start(t); s.stop(t + 2.4);
+    const n = ctx.createBufferSource(); n.buffer = this.noise;
+    const ng = ctx.createGain(); ng.gain.setValueAtTime(1.2, t); ng.gain.exponentialRampToValueAtTime(0.001, t + 0.25);
+    n.connect(ng).connect(out); n.start(t, Math.random()); n.stop(t + 0.3);
+    const o = ctx.createOscillator(); o.type = 'sine'; o.frequency.setValueAtTime(70, t); o.frequency.exponentialRampToValueAtTime(25, t + 0.6);
+    const og = ctx.createGain(); og.gain.setValueAtTime(2, t); og.gain.exponentialRampToValueAtTime(0.001, t + 0.7);
+    o.connect(og).connect(this.master); o.start(t); o.stop(t + 0.75);
+  }
+  throwGrenade() {
+    if (!this._ok()) return;
+    this.click(2200, 0.15);
+    const ctx = this.ctx, t = ctx.currentTime + 0.05;
+    const n = ctx.createBufferSource(); n.buffer = this.noise;
+    const f = ctx.createBiquadFilter(); f.type = 'bandpass'; f.Q.value = 2; f.frequency.setValueAtTime(600, t); f.frequency.exponentialRampToValueAtTime(1500, t + 0.25);
+    const g = ctx.createGain(); g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.4, t + 0.08); g.gain.exponentialRampToValueAtTime(0.001, t + 0.3);
+    n.connect(f).connect(g).connect(this._out(null)); n.start(t, Math.random()); n.stop(t + 0.35);
+  }
+  clink(pos) {
+    if (!this._ok()) return;
+    const ctx = this.ctx, t = ctx.currentTime;
+    const out = this._out(pos, 0.5);
+    for (const fr of [2300, 3550]) {
+      const o = ctx.createOscillator(); o.type = 'triangle'; o.frequency.value = fr * (0.95 + Math.random() * 0.1);
+      const g = ctx.createGain(); g.gain.setValueAtTime(0.4, t); g.gain.exponentialRampToValueAtTime(0.001, t + 0.12);
+      o.connect(g).connect(out); o.start(t); o.stop(t + 0.15);
+    }
+  }
+  pickup() {
+    if (!this._ok() || this._custom('pickup')) return;
+    const ctx = this.ctx;
+    [523.3, 659.3, 784, 1046.5].forEach((fr, i) => {
+      const t = ctx.currentTime + i * 0.07;
+      const o = ctx.createOscillator(); o.type = 'triangle'; o.frequency.value = fr;
+      const g = ctx.createGain(); g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.3, t + 0.01); g.gain.exponentialRampToValueAtTime(0.001, t + 0.35);
+      o.connect(g).connect(this._out(null)); o.start(t); o.stop(t + 0.4);
+    });
+  }
+  // dunkler Gong, wenn eine Waffe am Brunnen erscheint
+  pickupReady() {
+    if (!this._ok()) return;
+    const ctx = this.ctx;
+    [[146.8, 0], [220, 0.25], [293.7, 0.5]].forEach(([fr, dt]) => {
+      const t = ctx.currentTime + dt;
+      const o = ctx.createOscillator(); o.type = 'sine'; o.frequency.value = fr;
+      const g = ctx.createGain(); g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.35, t + 0.02); g.gain.exponentialRampToValueAtTime(0.001, t + 2.2);
+      o.connect(g).connect(this._out(null)); o.start(t); o.stop(t + 2.3);
+    });
   }
   click(freq = 1800, gain = 0.25, when = 0) {
     if (!this._ok()) return;

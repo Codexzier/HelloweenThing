@@ -33,7 +33,7 @@ export const MODEL_LIST = {
     'campfire-pit', 'campfire-stand', 'tent-canvas', 'signpost', 'signpost-single', 'bucket', 'resource-wood',
     'fence-fortified', 'workbench', 'bedroll',
   ],
-  weapons: ['pistol', 'ammo_uzi'],
+  weapons: ['pistol', 'machinegun', 'rocketlauncher', 'grenade', 'ammo_rocket'],
 };
 
 export class Assets {

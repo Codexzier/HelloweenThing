@@ -374,8 +374,9 @@ export class Decals {
     }
     this.i = 0;
   }
-  add(x, z, s = 1.6) {
+  add(x, z, s = 1.6, scorch = false) {
     const it = this.items[this.i];
+    it.m.material.color.setRGB(scorch ? 0.12 : 1, scorch ? 0.1 : 1, scorch ? 0.09 : 1);
     this.i = (this.i + 1) % this.items.length;
     it.m.position.set(x, 0.03 + this.i * 0.0005, z);
     it.m.rotation.y = Math.random() * Math.PI * 2;

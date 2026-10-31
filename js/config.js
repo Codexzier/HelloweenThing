@@ -1,5 +1,5 @@
 // ------------------------------------------------------------
-//  "You can't not alive." – zentrale Spiel-Konfiguration
+//  "You cannot survive" – zentrale Spiel-Konfiguration
 // ------------------------------------------------------------
 
 export const CONFIG = {

@@ -9,6 +9,7 @@ import { Input } from './input.js';
 import { AudioFX } from './audio.js';
 import { UI } from './ui.js';
 import { Scoreboard } from './scoreboard.js';
+import { Projectiles, Pickups } from './weapons.js';
 import { Particles, Tracers, Decals, GroundFog, Bats, Lightning, createPostFX } from './effects.js';
 
 class Game {
@@ -54,6 +55,8 @@ class Game {
     this.lightning = new Lightning((d) => this.audio.thunder(d));
     this.player = new Player(this);
     this.zombies = new Zombies(this);
+    this.projectiles = new Projectiles(this);
+    this.pickups = new Pickups(this);
     this.autopilot = new Autopilot(this);
     this.post = createPostFX(this.renderer, this.scene, this.camera);
     let q = null;
@@ -73,7 +76,7 @@ class Game {
     document.addEventListener('visibilitychange', () => { if (document.hidden && this.state === 'playing') this.pause(); });
     this.canvas.addEventListener('click', () => { if (this.state === 'playing' && !this.auto && !this.input.locked) this.input.lock(); });
     this.player.root.visible = false;
-    this.player.pistol.visible = false;
+    this.player.gun.visible = false;
     this.state = 'menu';
     this.ui.show('menu');
     // ein erstes Rendern, damit Shader kompiliert sind
@@ -141,6 +144,8 @@ class Game {
     this.deathTimer = 0;
     this.player.reset();
     this.zombies.reset();
+    this.projectiles.reset();
+    this.pickups.reset();
     this.autopilot.reset();
     this.particles.clear();
     this.sparks.clear();
@@ -175,8 +180,10 @@ class Game {
     this.state = 'menu';
     this.input.unlock();
     this.zombies.reset();
+    this.projectiles.reset();
+    this.pickups.reset();
     this.player.root.visible = false;
-    this.player.pistol.visible = false;
+    this.player.gun.visible = false;
     this.player.torch.intensity = 0;
     document.getElementById('touch').classList.add('hidden');
     this.audio.setMusic(0.35);
@@ -230,6 +237,8 @@ class Game {
         this.audio.howl();
       }
       this.zombies.update(dt);
+      this.projectiles.update(dt);
+      this.pickups.update(dt);
       if (!player.dead && this.state === 'playing') this.playTime += dt;
       player.updateCamera(this.camera, dt);
       if (player.dead && this.state === 'playing') {
